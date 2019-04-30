@@ -15,11 +15,11 @@
  */
 package io.gravitee.management.service;
 
-import io.gravitee.management.model.MessageChannel;
-import io.gravitee.management.model.MessageEntity;
-import io.gravitee.management.model.MessageRecipientEntity;
+import io.gravitee.management.model.communication.CommunicationChannel;
+import io.gravitee.management.model.communication.CommunicationEntity;
+import io.gravitee.management.model.communication.CommunicationRecipientEntity;
 import io.gravitee.management.service.exceptions.MessageRecipientFormatException;
-import io.gravitee.management.service.impl.MessageServiceImpl;
+import io.gravitee.management.service.impl.CommunicationServiceImpl;
 import io.gravitee.repository.exceptions.TechnicalException;
 import io.gravitee.repository.management.api.ApiRepository;
 import io.gravitee.repository.management.api.MembershipRepository;
@@ -34,7 +34,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 import java.util.Collections;
 import java.util.Set;
 
-import static java.util.Optional.empty;
 import static java.util.Optional.of;
 import static org.assertj.core.api.Assertions.fail;
 import static org.junit.Assert.*;
@@ -46,10 +45,10 @@ import static org.mockito.Mockito.*;
  * @author GraviteeSource Team
  */
 @RunWith(MockitoJUnitRunner.class)
-public class MessageService_GetRecipientIdsTest {
+public class CommunicationService_GetRecipientIdsTest {
 
     @InjectMocks
-    private MessageServiceImpl messageService = new MessageServiceImpl();
+    private CommunicationServiceImpl messageService = new CommunicationServiceImpl();
 
     @Mock
     ApiRepository mockApiRepository;
@@ -65,20 +64,20 @@ public class MessageService_GetRecipientIdsTest {
         shouldThrowException(null, null);
         shouldThrowException("xxx", null);
 
-        MessageEntity messageEntity = new MessageEntity();
-        shouldThrowException(null, messageEntity);
-        shouldThrowException("xxx", messageEntity);
+        CommunicationEntity communicationEntity = new CommunicationEntity();
+        shouldThrowException(null, communicationEntity);
+        shouldThrowException("xxx", communicationEntity);
 
-        MessageRecipientEntity messageRecipientEntity = new MessageRecipientEntity();
-        messageEntity.setRecipient(messageRecipientEntity);
-        shouldThrowException("xxx", messageEntity);
+        CommunicationRecipientEntity communicationRecipientEntity = new CommunicationRecipientEntity();
+        communicationEntity.setRecipient(communicationRecipientEntity);
+        shouldThrowException("xxx", communicationEntity);
 
-        messageRecipientEntity.setRoleScope("API");
-        messageRecipientEntity.setRoleValues(Collections.emptyList());
-        shouldThrowException("xxx", messageEntity);
+        communicationRecipientEntity.setRoleScope("API");
+        communicationRecipientEntity.setRoleValues(Collections.emptyList());
+        shouldThrowException("xxx", communicationEntity);
     }
 
-    private void shouldThrowException(String apiId, MessageEntity message) {
+    private void shouldThrowException(String apiId, CommunicationEntity message) {
         try {
             Api api = new Api();
             api.setId(apiId);
@@ -98,14 +97,14 @@ public class MessageService_GetRecipientIdsTest {
 
     private void shouldNotGetGlobal(String scope) throws Exception {
 
-        MessageEntity messageEntity = new MessageEntity();
-        messageEntity.setChannel(MessageChannel.MAIL);
-        MessageRecipientEntity messageRecipientEntity = new MessageRecipientEntity();
-        messageRecipientEntity.setRoleScope(scope);
-        messageRecipientEntity.setRoleValues(Collections.singletonList("API_PUBLISHER"));
-        messageEntity.setRecipient(messageRecipientEntity);
+        CommunicationEntity communicationEntity = new CommunicationEntity();
+        communicationEntity.setChannel(CommunicationChannel.MAIL);
+        CommunicationRecipientEntity communicationRecipientEntity = new CommunicationRecipientEntity();
+        communicationRecipientEntity.setRoleScope(scope);
+        communicationRecipientEntity.setRoleValues(Collections.singletonList("API_PUBLISHER"));
+        communicationEntity.setRecipient(communicationRecipientEntity);
 
-        messageService.getRecipientsId(messageEntity);
+        messageService.getRecipientsId(communicationEntity);
 
         verify(mockMembershipRepository, never()).findByRole(any(), any());
         verify(mockApiRepository, never()).findById(any());
@@ -115,18 +114,18 @@ public class MessageService_GetRecipientIdsTest {
 
     @Test
     public void shouldGetGlobalAPIPublisher() throws Exception {
-        MessageEntity messageEntity = new MessageEntity();
-        messageEntity.setChannel(MessageChannel.MAIL);
-        MessageRecipientEntity messageRecipientEntity = new MessageRecipientEntity();
-        messageRecipientEntity.setRoleScope("MANAGEMENT");
-        messageRecipientEntity.setRoleValues(Collections.singletonList("API_PUBLISHER"));
-        messageEntity.setRecipient(messageRecipientEntity);
+        CommunicationEntity communicationEntity = new CommunicationEntity();
+        communicationEntity.setChannel(CommunicationChannel.MAIL);
+        CommunicationRecipientEntity communicationRecipientEntity = new CommunicationRecipientEntity();
+        communicationRecipientEntity.setRoleScope("MANAGEMENT");
+        communicationRecipientEntity.setRoleValues(Collections.singletonList("API_PUBLISHER"));
+        communicationEntity.setRecipient(communicationRecipientEntity);
         Membership membership = new Membership();
         membership.setUserId("user-id");
         when(mockMembershipRepository.findByRole(RoleScope.MANAGEMENT, "API_PUBLISHER"))
                 .thenReturn(Collections.singleton(membership));
 
-        Set<String> recipientIds = messageService.getRecipientsId(messageEntity);
+        Set<String> recipientIds = messageService.getRecipientsId(communicationEntity);
 
         assertNotNull("not null", recipientIds);
         assertEquals("size=1", 1, recipientIds.size());
@@ -147,14 +146,14 @@ public class MessageService_GetRecipientIdsTest {
     private void shouldNotGetSpecific(String scope) throws Exception {
         Api api = new Api();
         api.setId("api-id");
-        MessageEntity messageEntity = new MessageEntity();
-        messageEntity.setChannel(MessageChannel.MAIL);
-        MessageRecipientEntity messageRecipientEntity = new MessageRecipientEntity();
-        messageRecipientEntity.setRoleScope(scope);
-        messageRecipientEntity.setRoleValues(Collections.singletonList("API_PUBLISHER"));
-        messageEntity.setRecipient(messageRecipientEntity);
+        CommunicationEntity communicationEntity = new CommunicationEntity();
+        communicationEntity.setChannel(CommunicationChannel.MAIL);
+        CommunicationRecipientEntity communicationRecipientEntity = new CommunicationRecipientEntity();
+        communicationRecipientEntity.setRoleScope(scope);
+        communicationRecipientEntity.setRoleValues(Collections.singletonList("API_PUBLISHER"));
+        communicationEntity.setRecipient(communicationRecipientEntity);
 
-        messageService.getRecipientsId(api, messageEntity);
+        messageService.getRecipientsId(api, communicationEntity);
 
         verify(mockMembershipRepository, never()).findByRole(any(), any());
         verify(mockApiRepository, never()).findById(any());
@@ -167,12 +166,12 @@ public class MessageService_GetRecipientIdsTest {
         Api api = new Api();
         api.setId("api-id");
         api.setGroups(Collections.emptySet());
-        MessageEntity messageEntity = new MessageEntity();
-        messageEntity.setChannel(MessageChannel.MAIL);
-        MessageRecipientEntity messageRecipientEntity = new MessageRecipientEntity();
-        messageRecipientEntity.setRoleScope("APPLICATION");
-        messageRecipientEntity.setRoleValues(Collections.singletonList("OWNER"));
-        messageEntity.setRecipient(messageRecipientEntity);
+        CommunicationEntity communicationEntity = new CommunicationEntity();
+        communicationEntity.setChannel(CommunicationChannel.MAIL);
+        CommunicationRecipientEntity communicationRecipientEntity = new CommunicationRecipientEntity();
+        communicationRecipientEntity.setRoleScope("APPLICATION");
+        communicationRecipientEntity.setRoleValues(Collections.singletonList("OWNER"));
+        communicationEntity.setRecipient(communicationRecipientEntity);
         Membership membership = new Membership();
         membership.setUserId("user-id");
         when(mockApiRepository.findById("api-id"))
@@ -184,7 +183,7 @@ public class MessageService_GetRecipientIdsTest {
         when(mockMembershipRepository.findByReferencesAndRole(eq(MembershipReferenceType.APPLICATION), any(), any(), any()))
                 .thenReturn(Collections.singleton(membership));
 
-        Set<String> recipientIds = messageService.getRecipientsId(api, messageEntity);
+        Set<String> recipientIds = messageService.getRecipientsId(api, communicationEntity);
 
         assertNotNull("not null", recipientIds);
         assertEquals("size=1", 1, recipientIds.size());
@@ -200,12 +199,12 @@ public class MessageService_GetRecipientIdsTest {
         Api api = new Api();
         api.setId("api-id");
         api.setGroups(Collections.singleton("group-id"));
-        MessageEntity messageEntity = new MessageEntity();
-        messageEntity.setChannel(MessageChannel.MAIL);
-        MessageRecipientEntity messageRecipientEntity = new MessageRecipientEntity();
-        messageRecipientEntity.setRoleScope("APPLICATION");
-        messageRecipientEntity.setRoleValues(Collections.singletonList("OWNER"));
-        messageEntity.setRecipient(messageRecipientEntity);
+        CommunicationEntity communicationEntity = new CommunicationEntity();
+        communicationEntity.setChannel(CommunicationChannel.MAIL);
+        CommunicationRecipientEntity communicationRecipientEntity = new CommunicationRecipientEntity();
+        communicationRecipientEntity.setRoleScope("APPLICATION");
+        communicationRecipientEntity.setRoleValues(Collections.singletonList("OWNER"));
+        communicationEntity.setRecipient(communicationRecipientEntity);
         Membership membershipGroup = new Membership();
         membershipGroup.setUserId("user-group-id");
         Membership membership = new Membership();
@@ -221,7 +220,7 @@ public class MessageService_GetRecipientIdsTest {
         when(mockMembershipRepository.findByReferencesAndRole(eq(MembershipReferenceType.GROUP), any(), any(), any()))
                 .thenReturn(Collections.singleton(membershipGroup));
 
-        Set<String> recipientIds = messageService.getRecipientsId(api, messageEntity);
+        Set<String> recipientIds = messageService.getRecipientsId(api, communicationEntity);
 
         assertNotNull("not null", recipientIds);
         assertEquals("size=2", 2, recipientIds.size());

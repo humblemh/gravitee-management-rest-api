@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.management.model;
+package io.gravitee.management.model.communication;
 
 import java.util.Map;
 
@@ -21,28 +21,28 @@ import java.util.Map;
  * @author Nicolas GERAUD (nicolas.geraud at graviteesource.com)
  * @author GraviteeSource Team
  */
-public class MessageEntity {
+public class CommunicationEntity {
 
-    MessageRecipientEntity recipient;
+    CommunicationRecipientEntity recipient;
 
-    MessageChannel channel;
+    CommunicationChannel channel;
     String title;
     String text;
     Map<String, String> params;
 
-    public MessageRecipientEntity getRecipient() {
+    public CommunicationRecipientEntity getRecipient() {
         return recipient;
     }
 
-    public void setRecipient(MessageRecipientEntity recipient) {
+    public void setRecipient(CommunicationRecipientEntity recipient) {
         this.recipient = recipient;
     }
 
-    public MessageChannel getChannel() {
+    public CommunicationChannel getChannel() {
         return channel;
     }
 
-    public void setChannel(MessageChannel channel) {
+    public void setChannel(CommunicationChannel channel) {
         this.channel = channel;
     }
 

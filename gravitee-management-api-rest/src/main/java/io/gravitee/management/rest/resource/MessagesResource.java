@@ -16,12 +16,12 @@
 package io.gravitee.management.rest.resource;
 
 import io.gravitee.common.http.MediaType;
-import io.gravitee.management.model.MessageEntity;
+import io.gravitee.management.model.communication.CommunicationEntity;
 import io.gravitee.management.model.permissions.RolePermission;
 import io.gravitee.management.model.permissions.RolePermissionAction;
 import io.gravitee.management.rest.security.Permission;
 import io.gravitee.management.rest.security.Permissions;
-import io.gravitee.management.service.MessageService;
+import io.gravitee.management.service.CommunicationService;
 import io.swagger.annotations.Api;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -40,7 +40,7 @@ import javax.ws.rs.core.Response;
 public class MessagesResource extends AbstractResource {
 
     @Autowired
-    private MessageService messageService;
+    private CommunicationService communicationService;
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
@@ -48,7 +48,7 @@ public class MessagesResource extends AbstractResource {
     @Permissions({
             @Permission(value = RolePermission.MANAGEMENT_MESSAGE, acls = RolePermissionAction.CREATE)
     })
-    public Response create(final MessageEntity message) {
-        return Response.ok(messageService.create(message)).build();
+    public Response create(final CommunicationEntity message) {
+        return Response.ok(communicationService.create(message)).build();
     }
 }

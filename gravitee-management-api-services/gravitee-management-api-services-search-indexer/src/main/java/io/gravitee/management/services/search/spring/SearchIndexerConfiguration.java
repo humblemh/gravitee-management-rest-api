@@ -13,47 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.management.model;
+package io.gravitee.management.services.search.spring;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.util.List;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 /**
  * @author Nicolas GERAUD (nicolas.geraud at graviteesource.com)
  * @author GraviteeSource Team
  */
-public class MessageRecipientEntity {
+@Configuration
+public class SearchIndexerConfiguration {
 
-    @JsonProperty("role_scope")
-    String roleScope;
-
-    @JsonProperty("role_value")
-    List<String> roleValues;
-
-    String url;
-
-    public String getRoleScope() {
-        return roleScope;
-    }
-
-    public void setRoleScope(String roleScope) {
-        this.roleScope = roleScope;
-    }
-
-    public List<String> getRoleValues() {
-        return roleValues;
-    }
-
-    public void setRoleValues(List<String> roleValues) {
-        this.roleValues = roleValues;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
+    @Bean
+    public TaskScheduler taskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setThreadNamePrefix("searchindexer-");
+        return scheduler;
     }
 }

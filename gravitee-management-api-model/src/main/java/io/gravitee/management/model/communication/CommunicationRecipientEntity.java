@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.management.service;
+package io.gravitee.management.model.communication;
 
-import io.gravitee.management.model.message.MessageEntity;
-import io.gravitee.management.model.message.MessageQuery;
-import io.gravitee.management.model.message.NewMessageEntity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
@@ -25,9 +23,37 @@ import java.util.List;
  * @author Nicolas GERAUD (nicolas.geraud at graviteesource.com)
  * @author GraviteeSource Team
  */
-public interface MessageService {
+public class CommunicationRecipientEntity {
 
-    void send(NewMessageEntity message);
-    List<MessageEntity> search(MessageQuery query);
-    void ack(String messageId);
+    @JsonProperty("role_scope")
+    String roleScope;
+
+    @JsonProperty("role_value")
+    List<String> roleValues;
+
+    String url;
+
+    public String getRoleScope() {
+        return roleScope;
+    }
+
+    public void setRoleScope(String roleScope) {
+        this.roleScope = roleScope;
+    }
+
+    public List<String> getRoleValues() {
+        return roleValues;
+    }
+
+    public void setRoleValues(List<String> roleValues) {
+        this.roleValues = roleValues;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
 }

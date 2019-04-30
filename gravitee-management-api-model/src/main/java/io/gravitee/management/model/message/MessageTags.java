@@ -13,21 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.management.service;
-
-import io.gravitee.management.model.message.MessageEntity;
-import io.gravitee.management.model.message.MessageQuery;
-import io.gravitee.management.model.message.NewMessageEntity;
-
-import java.util.List;
+package io.gravitee.management.model.message;
 
 /**
  * @author Nicolas GERAUD (nicolas.geraud at graviteesource.com)
  * @author GraviteeSource Team
  */
-public interface MessageService {
 
-    void send(NewMessageEntity message);
-    List<MessageEntity> search(MessageQuery query);
-    void ack(String messageId);
+public enum MessageTags {
+    DATA_TO_INDEX
 }

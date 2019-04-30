@@ -15,26 +15,37 @@
  */
 package io.gravitee.management.service.impl.search;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.gravitee.management.model.ApiPageEntity;
+import io.gravitee.management.model.PageEntity;
+import io.gravitee.management.model.api.ApiEntity;
+import io.gravitee.management.model.message.MessageSearchIndexerEntity;
+import io.gravitee.management.model.message.MessageTags;
+import io.gravitee.management.model.message.NewMessageEntity;
 import io.gravitee.management.model.search.Indexable;
+import io.gravitee.management.service.ApiService;
+import io.gravitee.management.service.MessageService;
+import io.gravitee.management.service.PageService;
+import io.gravitee.management.service.exceptions.TechnicalManagementException;
 import io.gravitee.management.service.impl.search.lucene.DocumentSearcher;
 import io.gravitee.management.service.impl.search.lucene.DocumentTransformer;
 import io.gravitee.management.service.impl.search.lucene.SearchEngineIndexer;
 import io.gravitee.management.service.search.SearchEngineService;
 import io.gravitee.repository.exceptions.TechnicalException;
+import io.gravitee.repository.management.model.MessageRecipient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
+ * @author Nicolas GERAUD (nicolas.geraud at graviteesource.com)
  * @author GraviteeSource Team
  */
 @Component
@@ -54,9 +65,82 @@ public class SearchEngineServiceImpl implements SearchEngineService {
     @Autowired
     private Collection<DocumentSearcher> searchers;
 
+    @Autowired
+    private MessageService messageService;
+
+    @Autowired
+    private ApiService apiService;
+
+    @Autowired
+    private PageService pageService;
+
+    private ObjectMapper mapper = new ObjectMapper();
+
+    private static final String ACTION_INDEX = "I";
+    private static final String ACTION_DELETE = "D";
+
     @Async
     @Override
     public void index(Indexable source) {
+        MessageSearchIndexerEntity content = new MessageSearchIndexerEntity();
+        content.setAction(ACTION_INDEX);
+        content.setId(source.getId());
+        content.setClazz(source.getClass().getName());
+
+        sendMessage(content);
+    }
+
+    @Async
+    @Override
+    public void delete(Indexable source) {
+        MessageSearchIndexerEntity content = new MessageSearchIndexerEntity();
+        content.setAction(ACTION_DELETE);
+        content.setId(source.getId());
+        content.setClazz(source.getClass().getName());
+
+        sendMessage(content);
+    }
+
+    private void sendMessage(MessageSearchIndexerEntity content) {
+        try {
+            NewMessageEntity msg = new NewMessageEntity();
+            msg.setTags(Collections.singletonList(MessageTags.DATA_TO_INDEX));
+            msg.setTo(MessageRecipient.MANAGEMENT_APIS.name());
+            msg.setTtlInSeconds(60);
+            msg.setContent(mapper.writeValueAsString(content));
+            messageService.send(msg);
+        } catch (JsonProcessingException e) {
+            logger.error("Unexpected error while sending a message", e);
+        }
+    }
+
+    @Override
+    public void readMessage(MessageSearchIndexerEntity content) {
+        Indexable source = getSource(content.getClazz(), content.getId());
+        if (source == null) {
+            logger.error("Unable to get source from message content [{}]", content);
+            throw new TechnicalManagementException("Unable to get source from message content [" + content + "]");
+        }
+
+        if (ACTION_DELETE.equals(content.getAction())) {
+            deleteLocally(source);
+        } else if (ACTION_INDEX.equals(content.getAction())) {
+            indexLocally(source);
+        }
+    }
+
+    private Indexable getSource(String clazz, String id) {
+        if (ApiEntity.class.getName().equals(clazz)) {
+            return apiService.findById(id);
+        } else if (PageEntity.class.getName().equals(clazz) || ApiPageEntity.class.getName().equals(clazz)) {
+            return pageService.findById(id);
+        }
+        return null;
+    }
+
+    @Async
+    @Override
+    public void indexLocally(Indexable source) {
         transformers.stream()
                 .filter(transformer -> transformer.handle(source.getClass()))
                 .findFirst()
@@ -71,7 +155,7 @@ public class SearchEngineServiceImpl implements SearchEngineService {
 
     @Async
     @Override
-    public void delete(Indexable source) {
+    public void deleteLocally(Indexable source) {
         transformers.stream()
                 .filter(transformer -> transformer.handle(source.getClass()))
                 .findFirst()
@@ -104,4 +188,5 @@ public class SearchEngineServiceImpl implements SearchEngineService {
 
         return results.get();
     }
+
 }

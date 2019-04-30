@@ -20,6 +20,7 @@ import io.gravitee.management.model.*;
 import io.gravitee.management.model.api.ApiEntity;
 import io.gravitee.management.model.api.UpdateApiEntity;
 import io.gravitee.management.model.api.header.ApiHeaderEntity;
+import io.gravitee.management.model.communication.CommunicationEntity;
 import io.gravitee.management.model.notification.NotifierEntity;
 import io.gravitee.management.model.permissions.RolePermission;
 import io.gravitee.management.model.permissions.RolePermissionAction;
@@ -27,12 +28,11 @@ import io.gravitee.management.rest.resource.param.LifecycleActionParam;
 import io.gravitee.management.rest.resource.param.LifecycleActionParam.LifecycleAction;
 import io.gravitee.management.rest.security.Permission;
 import io.gravitee.management.rest.security.Permissions;
-import io.gravitee.management.service.MessageService;
+import io.gravitee.management.service.CommunicationService;
 import io.gravitee.management.service.NotifierService;
 import io.gravitee.management.service.QualityMetricsService;
 import io.gravitee.management.service.exceptions.ApiNotFoundException;
 import io.gravitee.management.service.exceptions.ForbiddenAccessException;
-import io.gravitee.management.service.jackson.ser.api.ApiSerializer;
 import io.gravitee.repository.management.model.NotificationReferenceType;
 import io.swagger.annotations.*;
 import org.glassfish.jersey.message.internal.HttpHeaderReader;
@@ -47,7 +47,6 @@ import javax.ws.rs.core.*;
 import javax.ws.rs.core.Response.Status;
 import java.io.ByteArrayOutputStream;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -77,7 +76,7 @@ public class ApiResource extends AbstractResource {
     private QualityMetricsService qualityMetricsService;
 
     @Autowired
-    private MessageService messageService;
+    private CommunicationService communicationService;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -459,8 +458,8 @@ public class ApiResource extends AbstractResource {
     @Permissions({
             @Permission(value = RolePermission.API_MESSAGE, acls = RolePermissionAction.CREATE)
     })
-    public Response create(@PathParam("api") String api, final MessageEntity message) {
-        return Response.ok(messageService.create(api, message)).build();
+    public Response create(@PathParam("api") String api, final CommunicationEntity message) {
+        return Response.ok(communicationService.create(api, message)).build();
     }
 
     @GET

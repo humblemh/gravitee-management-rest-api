@@ -13,11 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.management.service;
-
-import io.gravitee.management.model.message.MessageEntity;
-import io.gravitee.management.model.message.MessageQuery;
-import io.gravitee.management.model.message.NewMessageEntity;
+package io.gravitee.management.model.message;
 
 import java.util.List;
 
@@ -25,9 +21,24 @@ import java.util.List;
  * @author Nicolas GERAUD (nicolas.geraud at graviteesource.com)
  * @author GraviteeSource Team
  */
-public interface MessageService {
+public class MessageQuery {
 
-    void send(NewMessageEntity message);
-    List<MessageEntity> search(MessageQuery query);
-    void ack(String messageId);
+    private String to;
+    private List<MessageTags> tags;
+
+    public String getTo() {
+        return to;
+    }
+
+    public void setTo(String to) {
+        this.to = to;
+    }
+
+    public List<MessageTags> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<MessageTags> tags) {
+        this.tags = tags;
+    }
 }

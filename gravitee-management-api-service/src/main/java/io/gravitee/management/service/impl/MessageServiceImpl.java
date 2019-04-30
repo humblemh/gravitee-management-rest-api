@@ -15,40 +15,29 @@
  */
 package io.gravitee.management.service.impl;
 
-import freemarker.template.Configuration;
-import freemarker.template.Template;
-import freemarker.template.TemplateException;
-import io.gravitee.common.http.HttpMethod;
-import io.gravitee.management.model.*;
-import io.gravitee.management.service.*;
-import io.gravitee.management.service.builder.EmailNotificationBuilder;
-import io.gravitee.management.service.exceptions.ApiNotFoundException;
-import io.gravitee.management.service.exceptions.MessageEmptyException;
-import io.gravitee.management.service.exceptions.MessageRecipientFormatException;
+import io.gravitee.common.utils.UUID;
+import io.gravitee.management.model.message.MessageEntity;
+import io.gravitee.management.model.message.MessageQuery;
+import io.gravitee.management.model.message.MessageTags;
+import io.gravitee.management.model.message.NewMessageEntity;
+import io.gravitee.management.service.MessageService;
+import io.gravitee.management.service.exceptions.Message2RecipientNotFoundException;
 import io.gravitee.management.service.exceptions.TechnicalManagementException;
-import io.gravitee.management.service.notification.ApiHook;
-import io.gravitee.management.service.notification.Hook;
-import io.gravitee.management.service.notification.PortalHook;
-import io.gravitee.management.service.notifiers.WebNotifierService;
+import io.gravitee.node.api.Node;
 import io.gravitee.repository.exceptions.TechnicalException;
-import io.gravitee.repository.management.api.ApiRepository;
-import io.gravitee.repository.management.api.MembershipRepository;
-import io.gravitee.repository.management.api.SubscriptionRepository;
-import io.gravitee.repository.management.api.search.SubscriptionCriteria;
-import io.gravitee.repository.management.model.*;
+import io.gravitee.repository.management.api.MessageRepository;
+import io.gravitee.repository.management.api.search.MessageCriteria;
+import io.gravitee.repository.management.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
-import org.springframework.util.StringUtils;
 
-import java.io.IOException;
-import java.util.*;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
-
-import static io.gravitee.management.service.impl.MessageServiceImpl.MesssageEvent.MESSAGE_SENT;
 
 /**
  * @author Nicolas GERAUD (nicolas.geraud at graviteesource.com)
@@ -57,258 +46,111 @@ import static io.gravitee.management.service.impl.MessageServiceImpl.MesssageEve
 @Component
 public class MessageServiceImpl extends AbstractService implements MessageService {
 
-    private final Logger LOGGER = LoggerFactory.getLogger(MessageServiceImpl.class);
+    private final Logger logger = LoggerFactory.getLogger(MessageServiceImpl.class);
 
     @Autowired
-    ApiRepository apiRepository;
+    MessageRepository messageRepository;
 
     @Autowired
-    MembershipRepository membershipRepository;
-
-    @Autowired
-    SubscriptionRepository subscriptionRepository;
-
-    @Autowired
-    PortalNotificationService portalNotificationService;
-
-    @Autowired
-    UserService userService;
-
-    @Autowired
-    AuditService auditService;
-
-    @Autowired
-    EmailService emailService;
-
-    @Autowired
-    ApiService apiService;
-
-    @Autowired
-    private Configuration freemarkerConfiguration;
-
-    @Autowired
-    WebNotifierService webNotifierService;
-
-    @Value("${email.from}")
-    private String defaultFrom;
-
-    public enum MesssageEvent implements Audit.AuditEvent {
-        MESSAGE_SENT
-    }
+    Node node;
 
     @Override
-    public int create(String apiId, MessageEntity message) {
-        assertMessageNotEmpty(message);
-        try {
-            Optional<Api> optionalApi = apiRepository.findById(apiId);
-            if (!optionalApi.isPresent()) {
-                throw new ApiNotFoundException(apiId);
-            }
-            Api api = optionalApi.get();
-
-            int msgSize = send(api, message, getRecipientsId(api, message));
-
-            auditService.createApiAuditLog(
-                    apiId,
-                    Collections.emptyMap(),
-                    MESSAGE_SENT,
-                    new Date(),
-                    null,
-                    message);
-            return msgSize;
-        } catch(TechnicalException ex) {
-            LOGGER.error("An error occurs while trying to get create a message", ex);
-            throw new TechnicalManagementException("An error occurs while trying to create a message", ex);
+    public void send(NewMessageEntity messageEntity) {
+        if (messageEntity.getTo() == null || messageEntity.getTo().isEmpty()) {
+            throw new Message2RecipientNotFoundException();
         }
-    }
 
-    @Override
-    public int create(MessageEntity message) {
-        assertMessageNotEmpty(message);
-
-        int msgSize = send(null, message, getRecipientsId(message));
-
-        auditService.createPortalAuditLog(
-                Collections.emptyMap(),
-                MESSAGE_SENT,
-                getAuthenticatedUsername(),
-                new Date(),
-                null,
-                message);
-        return msgSize;
-    }
-
-    private int send(Api api, MessageEntity message, Set<String> recipientsId) {
-        switch (message.getChannel()) {
-            case MAIL:
-                Set<String> mails = getRecipientsEmails(recipientsId);
-                    if (!mails.isEmpty()) {
-                        emailService.sendAsyncEmailNotification(new EmailNotificationBuilder()
-                                .to(defaultFrom)
-                                .bcc(mails.toArray(new String[0]))
-                                .subject(message.getTitle())
-                                .template(EmailNotificationBuilder.EmailTemplate.GENERIC_MESSAGE)
-                                .params(Collections.singletonMap("message", message.getText()))
-                                .build());
-                }
-                return mails.size();
-
-            case PORTAL:
-                Hook hook = api==null ? PortalHook.MESSAGE : ApiHook.MESSAGE;
-                portalNotificationService.create(hook, new ArrayList<>(recipientsId), getPortalParams(api, message));
-                return recipientsId.size();
-
-            case HTTP:
-                webNotifierService.request(
-                        HttpMethod.POST,
-                        recipientsId.iterator().next(),
-                        message.getParams(),
-                        getPostMessage(api, message));
-                return 1;
-            default:
-                return 0;
+        Message message = new Message();
+        message.setId(UUID.toString(java.util.UUID.randomUUID()));
+        message.setFrom(node.id());
+        message.setTo(messageEntity.getTo());
+        message.setTags(convert(messageEntity.getTags()));
+        long now = System.currentTimeMillis();
+        message.setCreatedAt(new Date(now));
+        message.setUpdatedAt(message.getCreatedAt());
+        message.setDeleteAt(new Date(now + (messageEntity.getTtlInSeconds() * 1000)));
+        if (messageEntity.getContent() != null) {
+            message.setContent(messageEntity.getContent());
         }
-    }
-
-    @Override
-    public Set<String> getRecipientsId(MessageEntity message) {
-        if (MessageChannel.HTTP.equals(message.getChannel())) {
-            return Collections.singleton(message.getRecipient().getUrl());
-        }
-        return getRecipientsId(null, message);
-    }
-
-    @Override
-    public Set<String> getRecipientsId(Api api, MessageEntity message) {
-        if (message != null && MessageChannel.HTTP.equals(message.getChannel())) {
-            return Collections.singleton(message.getRecipient().getUrl());
-        }
-        assertRecipientsNotEmpty(message);
-        MessageRecipientEntity recipientEntity = message.getRecipient();
-        // 2 cases are implemented :
-        // - global sending (no apiId provided) + scope MANAGEMENT
-        // - api consumer (apiId provided) + scope APPLICATION
-        // the first 2 cases are for admin communication, the last one for the api publisher communication.
 
         try {
-            final Set<String> recipientIds = new HashSet<>();
-            // CASE 1 : global sending
-            if (api == null && RoleScope.MANAGEMENT.name().equals(recipientEntity.getRoleScope())) {
-                for (String roleName: recipientEntity.getRoleValues()) {
-                    recipientIds.addAll(
-                            membershipRepository.findByRole(RoleScope.MANAGEMENT, roleName)
-                                    .stream()
-                                    .map(Membership::getUserId)
-                                    .collect(Collectors.toSet()));
-                }
-            }
-            // CASE 2 : specific api consumers
-            else if (api != null && RoleScope.APPLICATION.name().equals(recipientEntity.getRoleScope())) {
-
-                // Get apps allowed to consume the api
-                List<String> applicationIds = subscriptionRepository.search(
-                        new SubscriptionCriteria.Builder()
-                                .apis(Collections.singleton(api.getId()))
-                                .status(Subscription.Status.ACCEPTED)
-                                .build())
-                        .stream()
-                        .map(Subscription::getApplication)
-                        .collect(Collectors.toList());
-
-                // Get members of the applications (direct members)
-                for (String roleName: recipientEntity.getRoleValues()) {
-                    recipientIds.addAll(
-                            membershipRepository.findByReferencesAndRole(
-                                    MembershipReferenceType.APPLICATION,
-                                    applicationIds,
-                                    RoleScope.APPLICATION,
-                                    roleName)
-                                    .stream()
-                                    .map(Membership::getUserId)
-                                    .collect(Collectors.toSet()));
-                }
-                // Get members of the applications (group members)
-                if (api.getGroups() != null && !api.getGroups().isEmpty()) {
-                    for (String roleName: recipientEntity.getRoleValues()) {
-                        recipientIds.addAll(
-                                membershipRepository.findByReferencesAndRole(
-                                        MembershipReferenceType.GROUP,
-                                        new ArrayList<>(api.getGroups()),
-                                        RoleScope.APPLICATION,
-                                        roleName)
-                                        .stream()
-                                        .map(Membership::getUserId)
-                                        .collect(Collectors.toSet()));
-                    }
-                }
-            }
-            return recipientIds;
-        } catch(TechnicalException ex) {
-            LOGGER.error("An error occurs while trying to get recipients", ex);
-            throw new TechnicalManagementException("An error occurs while trying to get recipients", ex);
+            messageRepository.create(message);
+        } catch (TechnicalException ex) {
+            logger.error("An error occurs while trying to create {}", message, ex);
+            throw new TechnicalManagementException("An error occurs while trying create " + message, ex);
         }
     }
 
-    private Set<String> getRecipientsEmails(Set<String> recipientsId) {
-        if(recipientsId.isEmpty()) {
-            return Collections.emptySet();
+    @Override
+    public List<MessageEntity> search(MessageQuery query) {
+        //convert tags
+        String[] tags = null;
+        if (query.getTags() != null) {
+            tags = query.getTags()
+                    .stream()
+                    .map(Enum::name)
+                    .toArray(String[]::new);
         }
-
-        Set<String> emails = userService.findByIds(new ArrayList<>(recipientsId))
+        MessageCriteria criteria = new MessageCriteria.Builder()
+                .to(query.getTo())
+                .tags(tags)
+                .notAckBy(node.id())
+                .notDeleted()
+                .build();
+        return messageRepository.search(criteria)
                 .stream()
-                .filter(userEntity -> !StringUtils.isEmpty(userEntity.getEmail()))
-                .map(UserEntity::getEmail)
-                .collect(Collectors.toSet());
-       return emails;
+                .map(this::map)
+                .collect(Collectors.toList());
     }
 
-    private void assertMessageNotEmpty(MessageEntity messageEntity) {
-        if (    messageEntity == null ||
-                (StringUtils.isEmpty(messageEntity.getTitle()) && StringUtils.isEmpty(messageEntity.getText()))) {
-            throw new MessageEmptyException();
-        }
-    }
-
-    private void assertRecipientsNotEmpty(MessageEntity messageEntity) {
-        if (    messageEntity == null ||
-                messageEntity.getRecipient() == null ||
-                messageEntity.getChannel() == null ||
-                messageEntity.getRecipient().getRoleScope() == null ||
-                messageEntity.getRecipient().getRoleValues() == null ||
-                messageEntity.getRecipient().getRoleValues().isEmpty()) {
-            throw new MessageRecipientFormatException();
-        }
-    }
-
-    private Map<String, Object> getPortalParams(Api api, MessageEntity message) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("title", message.getTitle());
-        params.put("message", message.getText());
-        if (api != null) {
-            Api paramApi = new Api();
-            paramApi.setId(api.getId());
-            paramApi.setName(api.getName());
-            paramApi.setVersion(api.getVersion());
-            params.put("api", paramApi);
-        }
-        return params;
-    }
-
-    private String getPostMessage(Api api, MessageEntity message) {
-        if (message.getText() == null || api == null) {
-            return message.getText();
-        }
+    @Override
+    public void ack(String messageId) {
         try {
-            Template template = new Template(new Date().toString(), message.getText(), freemarkerConfiguration);
-
-            ApiModelEntity apiEntity = apiService.findByIdForTemplates(api.getId());
-            Map<String, Object> model = new HashMap<>();
-            model.put("api", apiEntity);
-
-            return FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
-        } catch (IOException | TemplateException e) {
-            LOGGER.error("Unable to apply templating on the message", e);
-            throw new TechnicalManagementException("Unable to apply templating on the message", e);
+            Optional<Message> optMsg = messageRepository.findById(messageId);
+            //if not found, this is probably because it has been deleted
+            if (optMsg.isPresent()) {
+                Message msg = optMsg.get();
+                if (msg.getAcknowledgments() == null) {
+                    msg.setAcknowledgments(Collections.singletonList(node.id()));
+                } else {
+                    msg.getAcknowledgments().add(node.id());
+                }
+                messageRepository.update(msg);
+            }
+        } catch (TechnicalException ex) {
+            logger.error("An error occurs while trying to acknowledge a message", ex);
         }
+    }
+
+    private List<String> convert(List<io.gravitee.management.model.message.MessageTags> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return tags
+                .stream()
+                .map(Enum::name)
+                .collect(Collectors.toList());
+    }
+
+    private MessageEntity map(Message message) {
+        if (message == null) {
+            return null;
+        }
+
+        MessageEntity messageEntity = new MessageEntity();
+
+        messageEntity.setId(message.getId());
+        messageEntity.setTo(message.getTo());
+        messageEntity.setContent(message.getContent());
+        if (message.getTags() != null && !message.getTags().isEmpty()) {
+            messageEntity.setTags(
+                    message.getTags()
+                            .stream()
+                            .map(MessageTags::valueOf)
+                            .collect(Collectors.toList()));
+        }
+
+        return messageEntity;
     }
 }

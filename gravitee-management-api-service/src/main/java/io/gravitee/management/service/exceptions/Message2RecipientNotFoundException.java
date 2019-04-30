@@ -13,21 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.management.service;
+package io.gravitee.management.service.exceptions;
 
-import io.gravitee.management.model.message.MessageEntity;
-import io.gravitee.management.model.message.MessageQuery;
-import io.gravitee.management.model.message.NewMessageEntity;
-
-import java.util.List;
+import io.gravitee.common.http.HttpStatusCode;
 
 /**
  * @author Nicolas GERAUD (nicolas.geraud at graviteesource.com)
  * @author GraviteeSource Team
  */
-public interface MessageService {
+public class Message2RecipientNotFoundException extends AbstractManagementException {
 
-    void send(NewMessageEntity message);
-    List<MessageEntity> search(MessageQuery query);
-    void ack(String messageId);
+
+    @Override
+    public int getHttpStatusCode() {
+        return HttpStatusCode.BAD_REQUEST_400;
+    }
+
+    @Override
+    public String getMessage() {
+        return "Message recipients are missing.";
+    }
 }
