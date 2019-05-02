@@ -39,6 +39,7 @@ import java.util.*;
 
 import static io.gravitee.repository.management.model.Audit.AuditProperties.TAG;
 import static io.gravitee.repository.management.model.Tag.AuditEvent.*;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -236,7 +237,11 @@ public class TagServiceImpl extends AbstractService implements TagService {
         tagEntity.setId(tag.getId());
         tagEntity.setName(tag.getName());
         tagEntity.setDescription(tag.getDescription());
-        tagEntity.setRestrictedGroups(tag.getRestrictedGroups());
+        if (tag.getRestrictedGroups() == null) {
+            tagEntity.setRestrictedGroups(emptyList());
+        } else {
+            tagEntity.setRestrictedGroups(tag.getRestrictedGroups());
+        }
         return tagEntity;
     }
 }
